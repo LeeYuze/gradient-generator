@@ -13,6 +13,7 @@ class GradientApp {
             imageRadius: 3,
             imageRotation: 0,
             imagePos: { x: 0.5, y: 0.5 },
+            isImageEditing: false,
             width: 1920,
             height: 1080,
             format: 'png',
@@ -145,12 +146,24 @@ class GradientApp {
             });
         });
 
+        dom.mainPreview.addEventListener('click', (event) => {
+            if (event.target.classList.contains('preview-img')) {
+                this.enterImageEditing();
+                return;
+            }
+
+            if (event.target === dom.mainPreview) {
+                this.exitImageEditing();
+            }
+        });
+
         // Image Dragging
         const handleImageDrag = (startEvent) => {
             if (!startEvent.target.classList.contains('preview-img')) return;
 
             startEvent.preventDefault();
             startEvent.stopPropagation();
+            this.enterImageEditing();
 
             const startX = startEvent.touches ? startEvent.touches[0].clientX : startEvent.clientX;
             const startY = startEvent.touches ? startEvent.touches[0].clientY : startEvent.clientY;
@@ -209,6 +222,7 @@ class GradientApp {
             e.stopPropagation();
             this.state.image = null;
             this.state.imageSrc = null;
+            this.state.isImageEditing = false;
             dom.imageUpload.value = '';
             this.updateView();
         });
@@ -257,6 +271,7 @@ class GradientApp {
                 this.state.imageSrc = e.target.result;
                 this.state.imageRotation = 0;
                 this.state.imagePos = { x: 0.5, y: 0.5 };
+                this.state.isImageEditing = true;
                 this.dom.imageRotation.value = this.state.imageRotation;
                 this.updateView();
             };
@@ -293,6 +308,7 @@ class GradientApp {
             const img = document.createElement('img');
             img.src = state.imageSrc;
             img.className = 'preview-img';
+            img.classList.toggle('is-editing', state.isImageEditing);
             dom.mainPreview.appendChild(img);
             this.applyImageTransform(img);
             
@@ -314,7 +330,7 @@ class GradientApp {
         if (state.gridMode) dom.mainPreview.classList.add('grid-mode');
         else dom.mainPreview.classList.remove('grid-mode');
 
-        this.initMoveable();
+        if (state.isImageEditing) this.initMoveable();
     }
 
     adjustAspectRatio() {
@@ -374,6 +390,19 @@ class GradientApp {
         target.style.top = '0';
         target.style.borderRadius = `${state.imageRadius}%`;
         target.style.transform = `translate(${x}px, ${y}px) rotate(${state.imageRotation}deg)`;
+    }
+
+    enterImageEditing() {
+        if (!this.state.imageSrc || this.state.isImageEditing) return;
+        this.state.isImageEditing = true;
+        this.initMoveable();
+    }
+
+    exitImageEditing() {
+        if (!this.state.isImageEditing) return;
+        this.state.isImageEditing = false;
+        this.clearSnapGuides();
+        this.destroyMoveable();
     }
 
     getSnapResult(position, metrics, rect) {
