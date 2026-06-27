@@ -473,9 +473,8 @@ html, body {
     display: block;
     max-width: none; 
     object-fit: contain; 
-    /* pointer-events: none;  Removed to allow interaction */
     box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-    position: absolute; /* Added for positioning */
+    position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
@@ -486,6 +485,73 @@ html, body {
 
 .preview-img:active {
     cursor: grabbing;
+}
+
+.moveable-control-box {
+    --moveable-color: #38bdf8;
+    z-index: 40 !important;
+}
+
+.moveable-line {
+    background: rgba(56, 189, 248, 0.92) !important;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.42);
+}
+
+.moveable-control {
+    width: 12px !important;
+    height: 12px !important;
+    margin-top: -6px !important;
+    margin-left: -6px !important;
+    border: 2px solid white !important;
+    background: #0ea5e9 !important;
+    box-shadow: 0 6px 18px rgba(14, 165, 233, 0.32);
+}
+
+.moveable-rotation-control {
+    border-color: white !important;
+    background: #111827 !important;
+}
+
+.snap-guide {
+    position: absolute;
+    z-index: 35;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+}
+
+.snap-guide.is-visible {
+    opacity: 1;
+}
+
+.snap-guide::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        var(--guide-angle),
+        rgba(14, 165, 233, 0.95) 0,
+        rgba(14, 165, 233, 0.95) 8px,
+        transparent 8px,
+        transparent 14px
+    );
+    filter: drop-shadow(0 0 5px rgba(14, 165, 233, 0.45));
+}
+
+.snap-guide-vertical {
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    transform: translateX(-50%);
+    --guide-angle: to bottom;
+}
+
+.snap-guide-horizontal {
+    left: 0;
+    right: 0;
+    height: 1px;
+    transform: translateY(-50%);
+    --guide-angle: to right;
 }
 
 /* Toast */

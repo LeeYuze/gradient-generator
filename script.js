@@ -11,12 +11,15 @@ class GradientApp {
             imageSrc: null,
             imageScale: 50,
             imageRadius: 3,
+            imageRotation: 0,
             imagePos: { x: 0.5, y: 0.5 },
             width: 1920,
             height: 1080,
             format: 'png',
             gridMode: false
         };
+
+        this.moveable = null;
 
         this.presetsData = [
             { colors: ['#a18cd1', '#fbc2eb'], key: 'p_dreamy_purple' },
@@ -54,6 +57,7 @@ class GradientApp {
             imgControls: document.getElementById('imgControls'),
             imageScale: document.getElementById('imageScale'),
             imageRadius: document.getElementById('imageRadius'),
+            imageRotation: document.getElementById('imageRotation'),
             removeImgBtn: document.getElementById('removeImgBtn'),
             miniImgPreview: document.getElementById('miniImgPreview'),
             width: document.getElementById('width'),
@@ -143,37 +147,34 @@ class GradientApp {
 
         // Image Dragging
         const handleImageDrag = (startEvent) => {
-            const img = startEvent.target;
-            if (!img.classList.contains('preview-img')) return;
-            
+            if (!startEvent.target.classList.contains('preview-img')) return;
+
             startEvent.preventDefault();
             startEvent.stopPropagation();
-            
+
             const startX = startEvent.touches ? startEvent.touches[0].clientX : startEvent.clientX;
             const startY = startEvent.touches ? startEvent.touches[0].clientY : startEvent.clientY;
-            
             const rect = this.dom.mainPreview.getBoundingClientRect();
-            const initialPosX = this.state.imagePos.x;
-            const initialPosY = this.state.imagePos.y;
+            const initialPos = { ...this.state.imagePos };
 
             const onMove = (moveEvent) => {
+                moveEvent.preventDefault();
                 const clientX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
                 const clientY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
-                
-                const deltaX = clientX - startX;
-                const deltaY = clientY - startY;
-                
-                const percentX = deltaX / rect.width;
-                const percentY = deltaY / rect.height;
-                
-                this.state.imagePos.x = initialPosX + percentX;
-                this.state.imagePos.y = initialPosY + percentY;
-                
-                img.style.left = `${this.state.imagePos.x * 100}%`;
-                img.style.top = `${this.state.imagePos.y * 100}%`;
+                const rawPosition = {
+                    x: initialPos.x + (clientX - startX) / rect.width,
+                    y: initialPos.y + (clientY - startY) / rect.height
+                };
+                const metrics = this.getImageDrawMetrics(rect.width, rect.height);
+                const snapped = this.getSnapResult(rawPosition, metrics, rect);
+                this.state.imagePos = snapped.position;
+                this.applyImageTransform(startEvent.target);
+                this.updateSnapGuides(snapped.guides);
+                this.moveable && this.moveable.updateRect();
             };
 
             const onUp = () => {
+                this.clearSnapGuides();
                 window.removeEventListener('mousemove', onMove);
                 window.removeEventListener('mouseup', onUp);
                 window.removeEventListener('touchmove', onMove);
@@ -185,7 +186,7 @@ class GradientApp {
             window.addEventListener('touchmove', onMove, {passive: false});
             window.addEventListener('touchend', onUp);
         };
-        
+
         this.dom.mainPreview.addEventListener('mousedown', handleImageDrag);
         this.dom.mainPreview.addEventListener('touchstart', handleImageDrag, {passive: false});
 
@@ -214,6 +215,11 @@ class GradientApp {
 
         dom.imageScale.addEventListener('input', (e) => {
             this.state.imageScale = parseInt(e.target.value);
+            this.updateView();
+        });
+
+        dom.imageRotation.addEventListener('input', (e) => {
+            this.state.imageRotation = parseInt(e.target.value);
             this.updateView();
         });
 
@@ -249,6 +255,9 @@ class GradientApp {
             img.onload = () => {
                 this.state.image = img;
                 this.state.imageSrc = e.target.result;
+                this.state.imageRotation = 0;
+                this.state.imagePos = { x: 0.5, y: 0.5 };
+                this.dom.imageRotation.value = this.state.imageRotation;
                 this.updateView();
             };
             img.src = e.target.result;
@@ -276,21 +285,23 @@ class GradientApp {
         dom.mainPreview.style.background = gradient;
         dom.shadow.style.background = gradient;
         dom.cssValue.textContent = `linear-gradient(${state.angle}deg, ${state.colors[0]}, ${state.colors[1]})`;
+        this.adjustAspectRatio();
 
+        this.destroyMoveable();
         dom.mainPreview.innerHTML = '';
         if (state.imageSrc) {
             const img = document.createElement('img');
             img.src = state.imageSrc;
             img.className = 'preview-img';
-            img.style.width = `${state.imageScale}%`;
-            img.style.borderRadius = `${state.imageRadius}%`;
-            img.style.left = `${state.imagePos.x * 100}%`;
-            img.style.top = `${state.imagePos.y * 100}%`;
             dom.mainPreview.appendChild(img);
+            this.applyImageTransform(img);
             
             dom.dropZone.classList.add('has-image');
             dom.miniImgPreview.style.backgroundImage = `url(${state.imageSrc})`;
             dom.imgControls.style.display = 'flex';
+            dom.imageScale.value = state.imageScale;
+            dom.imageRotation.value = state.imageRotation;
+            dom.imageRadius.value = state.imageRadius;
         } else {
             dom.dropZone.classList.remove('has-image');
             dom.imgControls.style.display = 'none';
@@ -300,9 +311,10 @@ class GradientApp {
         dom.auroras[1].style.background = state.colors[1];
         dom.auroras[2].style.background = this.blendColors(state.colors[0], state.colors[1], 0.5);
 
-        this.adjustAspectRatio();
         if (state.gridMode) dom.mainPreview.classList.add('grid-mode');
         else dom.mainPreview.classList.remove('grid-mode');
+
+        this.initMoveable();
     }
 
     adjustAspectRatio() {
@@ -329,6 +341,219 @@ class GradientApp {
         dom.mainPreview.style.height = `${finalH}px`;
         dom.shadow.style.width = `${finalW}px`;
         dom.shadow.style.height = `${finalH}px`;
+    }
+
+    getImageWidthPercent() {
+        return this.state.imageScale;
+    }
+
+    getImageDrawMetrics(width, height) {
+        const { state } = this;
+        if (!state.image) return null;
+
+        const imgRatio = state.image.width / state.image.height || 1;
+        const drawW = width * (this.getImageWidthPercent() / 100);
+        const drawH = drawW / imgRatio;
+        const centerX = state.imagePos.x * width;
+        const centerY = state.imagePos.y * height;
+
+        return { drawW, drawH, centerX, centerY };
+    }
+
+    applyImageTransform(target) {
+        const { state } = this;
+        const rect = this.dom.mainPreview.getBoundingClientRect();
+        const metrics = this.getImageDrawMetrics(rect.width, rect.height);
+        if (!metrics) return;
+
+        const x = metrics.centerX - metrics.drawW / 2;
+        const y = metrics.centerY - metrics.drawH / 2;
+
+        target.style.width = `${this.getImageWidthPercent()}%`;
+        target.style.left = '0';
+        target.style.top = '0';
+        target.style.borderRadius = `${state.imageRadius}%`;
+        target.style.transform = `translate(${x}px, ${y}px) rotate(${state.imageRotation}deg)`;
+    }
+
+    getSnapResult(position, metrics, rect) {
+        const threshold = 8;
+        const next = { ...position };
+        const guides = { x: null, y: null };
+        const angle = Math.abs(this.state.imageRotation) * Math.PI / 180;
+        const snapWidth = Math.abs(metrics.drawW * Math.cos(angle)) + Math.abs(metrics.drawH * Math.sin(angle));
+        const snapHeight = Math.abs(metrics.drawW * Math.sin(angle)) + Math.abs(metrics.drawH * Math.cos(angle));
+
+        const snapAxis = (axis, centerValue, size, stageSize) => {
+            const half = size / 2;
+            const anchors = [
+                { value: centerValue - half, offset: half },
+                { value: centerValue, offset: 0 },
+                { value: centerValue + half, offset: -half }
+            ];
+            const targets = [0, stageSize / 2, stageSize];
+            let best = null;
+
+            anchors.forEach(anchor => {
+                targets.forEach(target => {
+                    const distance = Math.abs(anchor.value - target);
+                    if (distance <= threshold && (!best || distance < best.distance)) {
+                        best = {
+                            distance,
+                            centerValue: target + anchor.offset,
+                            guidePercent: (target / stageSize) * 100
+                        };
+                    }
+                });
+            });
+
+            if (!best) return centerValue;
+            guides[axis] = best.guidePercent;
+            return best.centerValue;
+        };
+
+        const centerX = snapAxis('x', position.x * rect.width, snapWidth, rect.width);
+        const centerY = snapAxis('y', position.y * rect.height, snapHeight, rect.height);
+        next.x = centerX / rect.width;
+        next.y = centerY / rect.height;
+
+        return { position: next, guides };
+    }
+
+    ensureSnapGuides() {
+        const { mainPreview } = this.dom;
+        let vertical = mainPreview.querySelector('.snap-guide-vertical');
+        let horizontal = mainPreview.querySelector('.snap-guide-horizontal');
+
+        if (!vertical) {
+            vertical = document.createElement('div');
+            vertical.className = 'snap-guide snap-guide-vertical';
+            mainPreview.appendChild(vertical);
+        }
+
+        if (!horizontal) {
+            horizontal = document.createElement('div');
+            horizontal.className = 'snap-guide snap-guide-horizontal';
+            mainPreview.appendChild(horizontal);
+        }
+
+        return { vertical, horizontal };
+    }
+
+    updateSnapGuides(guides) {
+        const { vertical, horizontal } = this.ensureSnapGuides();
+
+        if (guides.x === null) {
+            vertical.classList.remove('is-visible');
+        } else {
+            vertical.style.left = `${guides.x}%`;
+            vertical.classList.add('is-visible');
+        }
+
+        if (guides.y === null) {
+            horizontal.classList.remove('is-visible');
+        } else {
+            horizontal.style.top = `${guides.y}%`;
+            horizontal.classList.add('is-visible');
+        }
+    }
+
+    clearSnapGuides() {
+        this.dom.mainPreview.querySelectorAll('.snap-guide').forEach(guide => {
+            guide.classList.remove('is-visible');
+        });
+    }
+
+    initMoveable() {
+        const target = this.dom.mainPreview.querySelector('.preview-img');
+        if (!target || !window.Moveable) {
+            this.destroyMoveable();
+            return;
+        }
+
+        if (!this.moveable) {
+            this.moveable = new Moveable(this.dom.mainPreview, {
+                target,
+                draggable: true,
+                resizable: true,
+                rotatable: true,
+                snappable: false,
+                snapCenter: true,
+                snapGap: false,
+                snapThreshold: 6,
+                origin: false,
+                keepRatio: true,
+                throttleDrag: 0,
+                throttleResize: 0,
+                throttleRotate: 0,
+                renderDirections: ['nw', 'ne', 'sw', 'se'],
+                rotationPosition: 'top'
+            });
+
+            this.moveable
+                .on('dragStart', ({ set }) => {
+                    const rect = this.dom.mainPreview.getBoundingClientRect();
+                    const metrics = this.getImageDrawMetrics(rect.width, rect.height);
+                    set([metrics.centerX - metrics.drawW / 2, metrics.centerY - metrics.drawH / 2]);
+                })
+                .on('drag', ({ beforeTranslate }) => {
+                    const rect = this.dom.mainPreview.getBoundingClientRect();
+                    const metrics = this.getImageDrawMetrics(rect.width, rect.height);
+                    const rawPosition = {
+                        x: (beforeTranslate[0] + metrics.drawW / 2) / rect.width,
+                        y: (beforeTranslate[1] + metrics.drawH / 2) / rect.height
+                    };
+                    const snapped = this.getSnapResult(rawPosition, metrics, rect);
+                    this.state.imagePos = snapped.position;
+                    this.applyImageTransform(target);
+                    this.updateSnapGuides(snapped.guides);
+                    this.moveable && this.moveable.updateRect();
+                })
+                .on('resizeStart', ({ setOrigin, dragStart }) => {
+                    setOrigin(['50%', '50%']);
+                    const rect = this.dom.mainPreview.getBoundingClientRect();
+                    const metrics = this.getImageDrawMetrics(rect.width, rect.height);
+                    dragStart && dragStart.set([metrics.centerX - metrics.drawW / 2, metrics.centerY - metrics.drawH / 2]);
+                })
+                .on('resize', ({ width, drag }) => {
+                    const rect = this.dom.mainPreview.getBoundingClientRect();
+                    this.state.imageScale = Math.max(5, Math.min(300, Math.round((width / rect.width) * 100)));
+                    if (drag) {
+                        const metrics = this.getImageDrawMetrics(rect.width, rect.height);
+                        const rawPosition = {
+                            x: (drag.beforeTranslate[0] + metrics.drawW / 2) / rect.width,
+                            y: (drag.beforeTranslate[1] + metrics.drawH / 2) / rect.height
+                        };
+                        const snapped = this.getSnapResult(rawPosition, metrics, rect);
+                        this.state.imagePos = snapped.position;
+                        this.updateSnapGuides(snapped.guides);
+                    }
+                    this.applyImageTransform(target);
+                    this.dom.imageScale.value = this.state.imageScale;
+                    this.moveable && this.moveable.updateRect();
+                })
+                .on('rotateStart', ({ set }) => {
+                    set(this.state.imageRotation);
+                })
+                .on('rotate', ({ beforeRotate }) => {
+                    this.state.imageRotation = Math.round(beforeRotate);
+                    this.applyImageTransform(target);
+                    this.dom.imageRotation.value = this.state.imageRotation;
+                })
+                .on('renderEnd', () => {
+                    this.clearSnapGuides();
+                    this.moveable && this.moveable.updateRect();
+                });
+        } else {
+            this.moveable.target = target;
+            this.moveable.updateRect();
+        }
+    }
+
+    destroyMoveable() {
+        if (!this.moveable) return;
+        this.moveable.destroy();
+        this.moveable = null;
     }
 
     copyCSS() {
@@ -379,21 +604,18 @@ class GradientApp {
 
                 if (state.image) {
                     const img = state.image;
-                    const scale = state.imageScale / 100;
-                    const imgRatio = img.width / img.height;
-                    let drawW, drawH;
-                    drawW = w * scale;
-                    drawH = drawW / imgRatio;
-                    
-                    const centerX = state.imagePos.x * w;
-                    const centerY = state.imagePos.y * h;
-                    
-                    const dx = centerX - drawW / 2;
-                    const dy = centerY - drawH / 2;
+                    const metrics = this.getImageDrawMetrics(w, h);
+                    if (!metrics) return;
+                    const { drawW, drawH, centerX, centerY } = metrics;
+                    const dx = -drawW / 2;
+                    const dy = -drawH / 2;
 
                     // Handle Corner Radius
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(state.imageRotation * Math.PI / 180);
+
                     if (state.imageRadius > 0) {
-                        ctx.save();
                         const rX = drawW * (state.imageRadius / 100);
                         const rY = drawH * (state.imageRadius / 100);
                         
@@ -414,10 +636,11 @@ class GradientApp {
                         
                         ctx.clip();
                         ctx.drawImage(img, dx, dy, drawW, drawH);
-                        ctx.restore();
                     } else {
                         ctx.drawImage(img, dx, dy, drawW, drawH);
                     }
+
+                    ctx.restore();
                 }
 
                 const link = document.createElement('a');
@@ -453,15 +676,11 @@ class GradientApp {
 
         let imageGroup = '';
         if (state.image) {
-            const img = state.image;
-            const scale = state.imageScale / 100;
-            const imgRatio = img.width / img.height;
-            const drawW = w * scale;
-            const drawH = drawW / imgRatio;
-            const centerX = state.imagePos.x * w;
-            const centerY = state.imagePos.y * h;
-            const dx = centerX - drawW / 2;
-            const dy = centerY - drawH / 2;
+            const metrics = this.getImageDrawMetrics(w, h);
+            const { drawW, drawH, centerX, centerY } = metrics;
+            const dx = -drawW / 2;
+            const dy = -drawH / 2;
+            const transform = `translate(${centerX} ${centerY}) rotate(${state.imageRotation})`;
 
             if (state.imageRadius > 0) {
                 const rX = drawW * (state.imageRadius / 100);
@@ -470,9 +689,9 @@ class GradientApp {
         <clipPath id="clip">
             <rect x="${dx}" y="${dy}" width="${drawW}" height="${drawH}" rx="${rX}" ry="${rY}" />
         </clipPath>`;
-                imageGroup = `<image href="${state.imageSrc}" x="${dx}" y="${dy}" width="${drawW}" height="${drawH}" clip-path="url(#clip)" preserveAspectRatio="none" />`;
+                imageGroup = `<g transform="${transform}"><image href="${state.imageSrc}" x="${dx}" y="${dy}" width="${drawW}" height="${drawH}" clip-path="url(#clip)" preserveAspectRatio="none" /></g>`;
             } else {
-                imageGroup = `<image href="${state.imageSrc}" x="${dx}" y="${dy}" width="${drawW}" height="${drawH}" preserveAspectRatio="none" />`;
+                imageGroup = `<g transform="${transform}"><image href="${state.imageSrc}" x="${dx}" y="${dy}" width="${drawW}" height="${drawH}" preserveAspectRatio="none" /></g>`;
             }
         }
 

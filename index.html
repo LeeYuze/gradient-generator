@@ -168,7 +168,11 @@
                         <div class="control-row" style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
                             <div class="slider-item" style="display: flex; align-items: center; gap: 12px;">
                                 <span class="slider-label" data-lang="imageScale" style="min-width: 60px;">缩放比例</span>
-                                <input type="range" id="imageScale" min="10" max="90" value="50" style="flex: 1;">
+                                <input type="range" id="imageScale" min="5" max="300" value="50" style="flex: 1;">
+                            </div>
+                            <div class="slider-item" style="display: flex; align-items: center; gap: 12px;">
+                                <span class="slider-label" data-lang="imageRotation" style="min-width: 60px;">旋转角度</span>
+                                <input type="range" id="imageRotation" min="-180" max="180" value="0" style="flex: 1;">
                             </div>
                             <div class="slider-item" style="display: flex; align-items: center; gap: 12px;">
                                 <span class="slider-label" data-lang="imageRadius" style="min-width: 60px;">圆角大小</span>
@@ -250,6 +254,7 @@
     <!-- Toast -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <script src="https://cdn.jsdelivr.net/npm/moveable/dist/moveable.min.js"></script>
     <script src="i18n.js"></script>
     <script src="script.js"></script>
 </body>
