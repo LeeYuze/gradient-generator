@@ -214,6 +214,12 @@ html, body {
 }
 .btn-swap:hover { background: white; transform: rotate(180deg); color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
 
+.inspiration-actions {
+    display: grid;
+    grid-template-columns: 1fr 42px;
+    gap: 8px;
+}
+
 .btn-random {
     width: 100%; padding: 12px; border: 1px dashed rgba(0,0,0,0.15); border-radius: var(--radius-m);
     background: transparent; color: var(--text-secondary); font-weight: 500;
@@ -222,6 +228,20 @@ html, body {
 }
 .btn-random:hover { border-color: var(--accent); color: var(--accent); background: rgba(255,255,255,0.5); }
 .btn-random:active { transform: scale(0.98); }
+.btn-save-inspiration {
+    width: 42px;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: var(--radius-m);
+    background: rgba(255,255,255,0.65);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-save-inspiration:hover {
+    background: white;
+    color: var(--accent);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+}
 .shortcut-hint { font-size: 10px; background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px; }
 
 .group-header-row { display: flex; justify-content: space-between; align-items: center; }
@@ -266,6 +286,83 @@ html, body {
     padding: 4px; font-weight: 600; transform: translateY(100%); transition: transform 0.3s ease;
 }
 .preset-item:hover .preset-name { transform: translateY(0); }
+
+.saved-inspiration-section {
+    margin-top: 16px;
+}
+
+.mini-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.saved-count {
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.06);
+    color: var(--text-tertiary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+.saved-inspiration-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.saved-inspiration-item .preset-name {
+    display: none;
+}
+
+.saved-empty {
+    grid-column: 1 / -1;
+    border: 1px dashed rgba(0,0,0,0.1);
+    border-radius: 10px;
+    padding: 12px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    text-align: center;
+    background: rgba(255,255,255,0.45);
+}
+
+.saved-remove {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(17, 24, 39, 0.58);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.saved-inspiration-item:hover .saved-remove {
+    opacity: 1;
+}
+
+.saved-remove:hover {
+    transform: scale(1.08);
+    background: rgba(17, 24, 39, 0.82);
+}
 
 .upload-widget {
     border: 2px dashed rgba(0,0,0,0.1); border-radius: var(--radius-m); min-height: 80px;

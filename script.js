@@ -17,10 +17,12 @@ class GradientApp {
             width: 1920,
             height: 1080,
             format: 'png',
-            gridMode: false
+            gridMode: false,
+            savedInspirations: []
         };
 
         this.moveable = null;
+        this.storageKey = 'gradient-pro-saved-inspirations';
 
         this.presetsData = [
             { colors: ['#a18cd1', '#fbc2eb'], key: 'p_dreamy_purple' },
@@ -53,6 +55,9 @@ class GradientApp {
             anglePointer: document.getElementById('anglePointer'),
             angleText: document.getElementById('angleText'),
             presetGrid: document.getElementById('presetGrid'),
+            saveInspirationBtn: document.getElementById('saveInspirationBtn'),
+            savedInspirationGrid: document.getElementById('savedInspirationGrid'),
+            savedCount: document.getElementById('savedCount'),
             imageUpload: document.getElementById('imageUpload'),
             dropZone: document.getElementById('dropZone'),
             imgControls: document.getElementById('imgControls'),
@@ -77,12 +82,15 @@ class GradientApp {
     }
 
     init() {
+        this.state.savedInspirations = this.loadSavedInspirations();
         this.bindEvents();
         this.renderPresets();
+        this.renderSavedInspirations();
         this.updateView(); 
         
         window.addEventListener('languageChanged', () => {
             this.renderPresets();
+            this.renderSavedInspirations();
         });
 
         document.addEventListener('keydown', (e) => {
@@ -112,6 +120,7 @@ class GradientApp {
         });
 
         dom.randomBtn.addEventListener('click', () => this.randomize());
+        dom.saveInspirationBtn.addEventListener('click', () => this.saveCurrentInspiration());
 
         // Angle Logic
         let isDragging = false;
@@ -287,6 +296,77 @@ class GradientApp {
         this.dom.color1.value = this.state.colors[0];
         this.dom.color2.value = this.state.colors[1];
         this.updateView();
+    }
+
+    loadSavedInspirations() {
+        try {
+            const raw = localStorage.getItem(this.storageKey);
+            const items = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(items)) return [];
+
+            return items
+                .filter(item => {
+                    return item
+                        && Array.isArray(item.colors)
+                        && item.colors.length === 2
+                        && typeof item.angle === 'number';
+                })
+                .map((item, index) => ({
+                    id: item.id || `${Date.now().toString(36)}-${index}`,
+                    colors: item.colors,
+                    angle: item.angle,
+                    createdAt: item.createdAt || Date.now()
+                }));
+        } catch (error) {
+            return [];
+        }
+    }
+
+    persistSavedInspirations() {
+        localStorage.setItem(this.storageKey, JSON.stringify(this.state.savedInspirations));
+    }
+
+    saveCurrentInspiration() {
+        const { colors, angle, savedInspirations } = this.state;
+        const exists = savedInspirations.some(item => {
+            return item.angle === angle && item.colors[0] === colors[0] && item.colors[1] === colors[1];
+        });
+
+        if (exists) {
+            const text = window.langManager ? window.langManager.get('inspirationExists') : 'Already saved';
+            this.showToast(`<i class="fas fa-info-circle"></i> ${text}`);
+            return;
+        }
+
+        this.state.savedInspirations = [
+            {
+                id: Date.now().toString(36),
+                colors: [...colors],
+                angle,
+                createdAt: Date.now()
+            },
+            ...savedInspirations
+        ].slice(0, 24);
+
+        this.persistSavedInspirations();
+        this.renderSavedInspirations();
+
+        const text = window.langManager ? window.langManager.get('inspirationSaved') : 'Saved';
+        this.showToast(`<i class="fas fa-bookmark"></i> ${text}`);
+    }
+
+    applyInspiration(item) {
+        this.state.colors = [...item.colors];
+        this.state.angle = item.angle;
+        this.dom.color1.value = item.colors[0];
+        this.dom.color2.value = item.colors[1];
+        this.updateView();
+    }
+
+    removeInspiration(id) {
+        this.state.savedInspirations = this.state.savedInspirations.filter(item => item.id !== id);
+        this.persistSavedInspirations();
+        this.renderSavedInspirations();
     }
 
     updateView() {
@@ -762,6 +842,49 @@ class GradientApp {
                 div.classList.add('active');
             };
             container.appendChild(div);
+        });
+    }
+
+    renderSavedInspirations() {
+        const { savedInspirationGrid, savedCount } = this.dom;
+        const items = this.state.savedInspirations;
+        savedInspirationGrid.innerHTML = '';
+        savedCount.textContent = items.length;
+
+        if (!items.length) {
+            const empty = document.createElement('div');
+            empty.className = 'saved-empty';
+            empty.textContent = window.langManager ? window.langManager.get('emptyInspirations') : 'No saved items';
+            savedInspirationGrid.appendChild(empty);
+            return;
+        }
+
+        items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'preset-item saved-inspiration-item';
+            div.style.background = `linear-gradient(${item.angle}deg, ${item.colors[0]}, ${item.colors[1]})`;
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'saved-remove';
+            removeBtn.type = 'button';
+            removeBtn.setAttribute(
+                'aria-label',
+                window.langManager ? window.langManager.get('removeInspiration') : 'Remove inspiration'
+            );
+            removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+            removeBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this.removeInspiration(item.id);
+            });
+
+            const label = document.createElement('span');
+            label.className = 'preset-name';
+            label.textContent = `${item.angle}deg`;
+
+            div.appendChild(removeBtn);
+            div.appendChild(label);
+            div.addEventListener('click', () => this.applyInspiration(item));
+            savedInspirationGrid.appendChild(div);
         });
     }
 

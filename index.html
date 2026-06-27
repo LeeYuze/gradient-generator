@@ -103,11 +103,16 @@
                         </div>
                     </div>
                     
-                    <button class="btn-random" id="randomBtn">
-                        <i class="fas fa-magic"></i>
-                        <span data-lang="randomGradient">随机灵感</span>
-                        <span class="shortcut-hint">Space</span>
-                    </button>
+                    <div class="inspiration-actions">
+                        <button class="btn-random" id="randomBtn">
+                            <i class="fas fa-magic"></i>
+                            <span data-lang="randomGradient">随机灵感</span>
+                            <span class="shortcut-hint">Space</span>
+                        </button>
+                        <button class="btn-save-inspiration" id="saveInspirationBtn" title="保存灵感" data-title-lang="saveInspiration">
+                            <i class="far fa-bookmark"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- 2. 角度控制 -->
@@ -143,6 +148,15 @@
                     </div>
                     <div class="preset-scroll-view" id="presetGrid">
                         <!-- JS 注入 -->
+                    </div>
+                    <div class="saved-inspiration-section">
+                        <div class="mini-section-title">
+                            <span data-lang="savedInspirations">我的灵感</span>
+                            <span class="saved-count" id="savedCount">0</span>
+                        </div>
+                        <div class="saved-inspiration-grid" id="savedInspirationGrid">
+                            <!-- JS 注入 -->
+                        </div>
                     </div>
                 </div>
 
